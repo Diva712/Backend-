@@ -24,7 +24,7 @@ const registerUser = asyncHandler(async (req, res) => {
     //humko pehle routes me middle ware lgana pdega taki files (images) send kar paye
     //check route code 
     const { fullName, email, username, password } = req.body
-
+    // console.log("req.body ko print kr rhe hai", req.body);
     //2.
     if (
         [fullName, email, username, password].some((field) => field?.trim() === "")
@@ -36,6 +36,12 @@ const registerUser = asyncHandler(async (req, res) => {
     if (!validator.isEmail(email)) {
         throw new ApiError(400, "Email is not valid !!")
     }
+
+    if (!req.files || !req.files.avatar || !req.files.avatar[0]) {
+        throw new ApiError(400, "Avatar image is required !!");
+    }
+
+    // console.log("req.files ko console kar rhe hai ", req.files);
 
     //3.
 
@@ -50,29 +56,43 @@ const registerUser = asyncHandler(async (req, res) => {
 
 
     //4.
-
-
-    console.log("req.files ko console kar rhe hai !!")
     const avatarLocalPath = req.files?.avatar[0]?.path;
-    const coverImageLocalPath = req.file?.coverImage[0]?.path;
-
-    if (!avatarLocalPath) {
-        throw new ApiError(400, "Avatar file is required !!")
-    }
+    //  const coverImageLocalPath = req.files?.coverImage[0]?.path;
+    const coverImageLocalPath = req.files?.coverImage?.[0]?.path;
 
     //5.
 
-    const avatar = await uploadOnCloudinary(avatarLocalPath)
-    console.log("avatar from cloudinary :")
-    console.log(avatar);
+    let avatar;
+    if (avatarLocalPath) {
+        avatar = await uploadOnCloudinary(avatarLocalPath)
+        console.log("avatar from cloudinary :")
+        console.log(avatar);
+    }
+    else {
+        throw new ApiError(400, "Avatar file is required !!");
+    }
 
-    const coverImage = await uploadOnCloudinary(coverImageLocalPath)
+
+    let coverImage;
+    if (coverImageLocalPath) {
+        coverImage = await uploadOnCloudinary(coverImageLocalPath);
+        console.log("coverImage from cloudinary :", coverImage);
+    }
+    else {
+        console.log("cover image is not selected!!")
+    }
+
+
 
     //fir se check
 
     if (!avatar) {
         throw new ApiError(400, "Avatar file is required !!")
     }
+
+
+
+
 
 
     //6.
