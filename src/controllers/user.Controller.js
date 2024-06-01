@@ -6,6 +6,28 @@ import { uploadOnCloudinary } from "../utils/cloudinary.js"
 import { ApiResponse } from "../utils/ApiResponse.js";
 
 
+//access and refresh token generation method
+const generateAccessAndRefreshToken = async (userId) => {
+    try {
+
+        const user = await User.findById(userId)
+        const accessToken = user.generateAccessToken()
+        const refreshToken = user.generateRefreshToken()
+
+        user.refreshToken = refreshToken
+        user.save({ validateBeforeSave: false })
+
+        return { accessToken, refreshToken }
+
+    } catch (error) {
+        throw new ApiError(500, "Something went wrong while generating refresh and access token !!")
+    }
+}
+
+
+
+
+//register controller
 const registerUser = asyncHandler(async (req, res) => {
     //register the user
 
@@ -50,7 +72,7 @@ const registerUser = asyncHandler(async (req, res) => {
     })
 
     if (existedUser) {
-        console.log(existedUser);
+        // console.log(existedUser);
         throw new ApiError(409, "User with email or  username already exist !!")
     }
 
@@ -120,20 +142,105 @@ const registerUser = asyncHandler(async (req, res) => {
 
     //9.
     return res.status(201).json(
-        new ApiResponse(201, createdUser, "User Registered Successfully!1")
+        new ApiResponse(201, createdUser, "User Registered Successfully!!")
     )
-
-
-
-
-
-
-
-
-
-
-
 
 })
 
-export { registerUser }
+
+//login controller
+const loginUser = asyncHandler(async (req, res) => {
+    //1. get a data form frontend
+    //2. verify username and email
+    //3. if found than check password
+    //4. if password matched send request token and refresh token
+    //5. send to user with in the secure cookies
+
+    // 1.
+    const { username, email, password } = req.body
+
+    //2.
+    if (!username || !email) {
+
+        throw new ApiError(404, "username or email is required !");
+    }
+
+    if (!password) {
+        throw new ApiError(404, "password is required !");
+    }
+    //3.
+    const user = await User.findOne({
+        $or: [{ username }, { email }]
+    })
+
+    if (!user) {
+        throw new ApiError(404, "User does not exist !! Please Registered first !")
+    }
+
+    //4.
+
+    const isPasswordValid = await user.isPasswordCorrect(password)
+
+
+    if (!isPasswordValid) {
+        throw new ApiError(401, "Invalid User Credentials !!")
+    }
+
+    const { accesToken, refreshToken } = await generateAccessAndRefreshToken(user._id)
+
+    //5.
+    //optional step we can also update the user instead call to user database !!
+    const loggedInUser = await User.findById(user._id).select("-password -refreshToken")
+
+    const options = {
+        httpOnly: true, // only server can be modified cookies
+        secure: true,
+    }
+
+    return res
+        .status(200)
+        .cookie("accesToken", accesToken, options)
+        .cookie("refreshToken", refreshToken, options)
+        .json(
+            new ApiResponse(200,
+                {
+                    user: loggedInUser,
+                    accesToken, // here jab maine cookie me save kar diya hai fir bhi send kr rha means ,,
+                    //there may be chances that user want to save refresh token or access token to save in local memory
+                    refreshToken
+                },
+                "User Logged In successfully !!"
+            )
+        )
+})
+
+
+//logoutUser Controller
+const logoutUser = asyncHandler(async (req, res) => {
+
+    //1. Clear all set cookies
+    //2. reset refreshedToken 
+    await User.findByIdAndUpdate(req.user._id,
+        {
+            $set: {
+                refreshToken: undefined
+            }
+        },
+        {
+            new: true
+        }
+    )
+
+    const options = {
+        httpOnly: true,
+        secure: true,
+    }
+
+    return res
+        .status(200)
+        .clearCookie("accesToken", options)
+        .clearCookie("refreshToken", options)
+        .json(new ApiResponse(200, {}, "User Logged Out Successfully !!"))
+})
+
+export { registerUser, loginUser, logoutUser }
