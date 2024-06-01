@@ -2,7 +2,7 @@ import { asyncHandler } from "../utils/asyncHandler.js";
 import validator from "validator";
 import { ApiError } from "../utils/ApiErrors.js"
 import { User } from "../models/user.Model.js"
-import { uploadOnCloudinary } from "../utils/cloudinary.js"
+import { deleteOnCloudinary, uploadOnCloudinary } from "../utils/cloudinary.js"
 import { ApiResponse } from "../utils/ApiResponse.js";
 import jwt from "jsonwebtoken"
 
@@ -372,9 +372,19 @@ const updateUserAvatar = asyncHandler(async (req, res) => {
         throw new ApiError(404, "Avatar files is missing !!")
     }
 
+    //delete old avatar image
+    const uSER = await User.findById(req.user?._id);
+    const oldAvatarImage = uSER.avatar
+    const deleteResult = await deleteOnCloudinary(oldAvatarImage);
+
+    if (deleteResult.result !== 'ok') {
+        console.error("Failed to delete old avatar image from Cloudinary:", deleteResult);
+        return res.status(500).json(new ApiResponse(500, "Unable to delete the old avatar form cloudinary !!"));
+    }
+
     const avatar = await uploadOnCloudinary(avatarLocalPath)
 
-    if (!avatar.secure_url) {
+    if (!avatar.url) {
         throw new ApiError(404, "Error while uploading on avatar !!")
     }
 
@@ -382,7 +392,7 @@ const updateUserAvatar = asyncHandler(async (req, res) => {
         req.user?._id,
         {
             $set: {
-                avatar: avatar.secure_url
+                avatar: avatar.url
             }
         },
         {
@@ -402,8 +412,18 @@ const updateCoverImage = asyncHandler(async (req, res) => {
         throw new ApiError(404, "Avatar files is missing !!")
     }
 
+    //delete old image
+    const uSER = await User.findById(req.user._id);
+    const oldCoverImage = uSER.coverImage
+    const deleteResult = await deleteOnCloudinary(oldCoverImage)
+
+    if (deleteResult.result !== 'ok') {
+        console.error("Failed to delete old avatar image from Cloudinary:", deleteResult);
+        return res.status(500).json(new ApiResponse(500, "Unable to delete the old avatar form cloudinary !!"));
+    }
+
     const coverUpdateImage = await uploadOnCloudinary(coverImageLocalPath);
-    if (!coverUpdateImage.secure_url) {
+    if (!coverUpdateImage.url) {
         throw new ApiError(404, "Error while uploading on avatar !!")
     }
 
@@ -411,7 +431,7 @@ const updateCoverImage = asyncHandler(async (req, res) => {
         req.user?._id,
         {
             $set: {
-                coverImage: coverUpdateImage.secure_url
+                coverImage: coverUpdateImage.url
             }
         },
         {
