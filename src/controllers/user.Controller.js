@@ -17,7 +17,8 @@ const generateAccessAndRefreshToken = async (userId) => {
 
         user.refreshToken = refreshToken
         user.save({ validateBeforeSave: false })
-
+        // console.log(accessToken)
+        // console.log(refreshToken)
         return { accessToken, refreshToken }
 
     } catch (error) {
@@ -158,16 +159,14 @@ const loginUser = asyncHandler(async (req, res) => {
     //5. send to user with in the secure cookies
 
     // 1.
-    console.log(req.body)
+    //console.log(req.body)
     const { email, username, password } = req.body
 
     //2.
     // if (!username && !email) {
     //     throw new ApiError(400 , "username or email is required !!")
     // }
-    console.log(username)
-    console.log(email)
-    console.log(password)
+
     // console.log(email)
     if (!username && !email) {
         throw new ApiError(404, "username or email is required !");
@@ -199,8 +198,9 @@ const loginUser = asyncHandler(async (req, res) => {
         throw new ApiError(401, "Invalid User Credentials !!")
     }
 
-    const { accesToken, refreshToken } = await generateAccessAndRefreshToken(user._id)
+    const { accessToken, refreshToken } = await generateAccessAndRefreshToken(user._id);
 
+    // console.log('Access Token:', accessToken);
     //5.
     //optional step we can also update the user instead call to user database !!
     const loggedInUser = await User.findById(user._id).select("-password -refreshToken")
@@ -209,16 +209,16 @@ const loginUser = asyncHandler(async (req, res) => {
         httpOnly: true, // only server can be modified cookies
         secure: true,
     }
-
     return res
         .status(200)
-        .cookie("accesToken", accesToken, options)
+        .cookie("accessToken", accessToken, options)
         .cookie("refreshToken", refreshToken, options)
         .json(
             new ApiResponse(200,
                 {
                     user: loggedInUser,
-                    accesToken, // here jab maine cookie me save kar diya hai fir bhi send kr rha means ,,
+                    accessToken,
+                    // here jab maine cookie me save kar diya hai fir bhi send kr rha means ,,
                     //there may be chances that user want to save refresh token or access token to save in local memory
                     refreshToken
                 },
@@ -251,7 +251,7 @@ const logoutUser = asyncHandler(async (req, res) => {
 
     return res
         .status(200)
-        .clearCookie("accesToken", options)
+        .clearCookie("accessToken", options)
         .clearCookie("refreshToken", options)
         .json(new ApiResponse(200, {}, "User Logged Out Successfully !!"))
 })
@@ -284,19 +284,25 @@ const refreshedAccessToken = asyncHandler(async (req, res) => {
             secure: true
         }
 
-        const { accessNewToken, refreshNewToken } = await generateAccessAndRefreshToken(user._id)
+        const { accessToken: accessNewToken, refreshToken: refreshNewToken } = await generateAccessAndRefreshToken(user._id)
+        if (!accessNewToken || !refreshNewToken) {
+            throw new ApiError(500, "Failed to generate new tokens.");
+        }
+
+        console.log("access", accessNewToken);
+        console.log("refresh", refreshNewToken);
 
         return res
             .status(200)
-            .cookie("accessToken", accessNewToken)
-            .cookie("refreshToken", refreshNewToken)
-            .json(new ApiResponse(200,
-                {
-                    accessToken: accessNewToken,
-                    refreshToken: refreshNewToken
-                },
-                "Access token refreshed successfully !!"
-            ))
+            .cookie("accessToken", accessNewToken, options)
+            .cookie("refreshToken", refreshNewToken, options)
+            .json(new ApiResponse(200, {
+                accessToken: accessNewToken,
+                refreshToken: refreshNewToken
+            }, "Access token refreshed successfully !!"));
+
+
+
 
     } catch (error) {
 

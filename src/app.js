@@ -21,11 +21,8 @@ app.use(express.json({
     limit: "16kb"
 }))
 
-//data url ke form bhi aa skta hai
-app.use(express.urlencoded({
-    extended: true,
-    limit: "16kb"
-}))
+//data url ke form bhi aa skta hainpm
+app.use(express.urlencoded())
 app.use(cookieParser()) // user ke browser ki cookie access kr pau server s isliye use hota hai
 //assests store kar skte hai
 app.use(express.static("public"))
