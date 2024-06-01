@@ -1,7 +1,7 @@
 import express from "express"
 import cors from "cors"
 import cookieParser from "cookie-parser"
-
+import bodyParser from 'body-parser';
 
 
 
@@ -15,10 +15,12 @@ app.use(cors({
     origin: process.env.CORS_ORIGIN,
     credentials: true
 }))
+app.use(bodyParser.json());
 //data ko jason ke form me easily accept kar ske
 app.use(express.json({
     limit: "16kb"
 }))
+
 //data url ke form bhi aa skta hai
 app.use(express.urlencoded({
     extended: true,
