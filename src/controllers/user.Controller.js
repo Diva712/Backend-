@@ -5,6 +5,7 @@ import { User } from "../models/user.Model.js"
 import { deleteOnCloudinary, uploadOnCloudinary } from "../utils/cloudinary.js"
 import { ApiResponse } from "../utils/ApiResponse.js";
 import jwt from "jsonwebtoken"
+import mongoose from "mongoose";
 
 
 //access and refresh token generation method
@@ -372,7 +373,7 @@ const updateUserAvatar = asyncHandler(async (req, res) => {
         throw new ApiError(404, "Avatar files is missing !!")
     }
 
-    //delete old avatar image
+    //delete old avatar image (made)
     const uSER = await User.findById(req.user?._id);
     const oldAvatarImage = uSER.avatar
     const deleteResult = await deleteOnCloudinary(oldAvatarImage);
@@ -403,7 +404,7 @@ const updateUserAvatar = asyncHandler(async (req, res) => {
     return res.statur(200).json(new ApiResponse(200, user, "Avatar updated successfully !!"))
 })
 
-
+//updateCover
 const updateCoverImage = asyncHandler(async (req, res) => {
 
     const coverImageLocalPath = req.file?.path;
@@ -412,14 +413,14 @@ const updateCoverImage = asyncHandler(async (req, res) => {
         throw new ApiError(404, "Avatar files is missing !!")
     }
 
-    //delete old image
+    //delete old image (made)
     const uSER = await User.findById(req.user._id);
     const oldCoverImage = uSER.coverImage
     const deleteResult = await deleteOnCloudinary(oldCoverImage)
 
     if (deleteResult.result !== 'ok') {
-        console.error("Failed to delete old avatar image from Cloudinary:", deleteResult);
-        return res.status(500).json(new ApiResponse(500, "Unable to delete the old avatar form cloudinary !!"));
+        console.error("Failed to delete old coverImage image from Cloudinary:", deleteResult);
+        return res.status(500).json(new ApiResponse(500, "Unable to delete the old coverImage form cloudinary !!"));
     }
 
     const coverUpdateImage = await uploadOnCloudinary(coverImageLocalPath);
@@ -444,6 +445,142 @@ const updateCoverImage = asyncHandler(async (req, res) => {
 
 })
 
+//getUserChannelProfile
+const getUserChannelProfile = asyncHandler(async (req, res) => {
+
+    const { username } = req.params
+    if (!username?.trim()) {
+        throw new ApiError(400, 'User name is missing !')
+    }
+
+    //aggreagate pipline method
+
+    const channel = await User.aggregate(
+        [
+            {
+                $match: {
+                    username: username?.toLowerCase()
+                }
+            },
+            {
+                $lookup: {
+                    form: "subscriptions",
+                    localField: "_id",
+                    foreignField: "channel", //age subsription schema s channel ko select karenge tb mlenge subscribers
+                    as: "subscribers"
+                }
+            },
+            {
+                $lookup: {
+                    form: "subscriptions",
+                    localField: "_id",
+                    foreignField: "subscriber", // wo sari cheeze mili jo maine subscribe kar rakhi hai
+                    as: "subscribedTo"
+                }
+            },
+            {
+                $addFields: {
+                    subscribersCount: {
+                        $size: "$subscribers"
+                    },
+                    channelSubscribedToCount: {
+                        $size: "subscribedTo"
+                    },
+                    isSubscribed: {
+                        $cond: {
+                            if: { $in: [req.user?._id, "$subscribers.subscriber"] },
+                            then: true,
+                            else: false
+                        }
+                    }
+                }
+            },
+            {
+                $project: {
+                    fullName: 1,
+                    username: 1,
+                    avatar: 1,
+                    coverImage: 1,
+                    subscribersCount: 1,
+                    channelSubscribedToCount: 1,
+                    isSubscribed: 1,
+                }
+            }
+        ]
+    )
+    console.log(channel);
+
+    if (!channel?.length) {
+        throw new ApiError(404, "channel does not exists !")
+    }
+
+    return res.status(200).json(new ApiResponse(200, channel[0], "User channel fetched successfully !!"))
+
+})
+
+
+const getWatchHistory = asyncHandler(async (req, res) => {
+
+    //req.user._id se humko string milta hai jisko mongoose covert kar deta mongo db ki id me
+
+    const user = await User.aggregate(
+        [
+            {
+                $match: {
+                    _id: new mongoose.Types.ObjectId(req.user._id)
+                }
+            },
+            {
+                $lookup: {
+                    from: "videos",
+                    localField: "watchHistory",
+                    foreignField: "_id",
+                    as: "watchHistory",
+
+                    pipeline: [
+                        {
+                            $lookup: {
+                                from: "users",
+                                localField: "owner",
+                                foreignField: "_id",
+                                as: "owner",
+
+                                pipeline: [
+                                    {
+                                        //bahar 2nd stage me bhi lga skte the project ki pipeline
+                                        $project: {
+                                            fullName: 1,
+                                            username: 1,
+                                            avatar: 1
+                                        }
+                                    }
+                                ]
+                            }
+                        },
+                        //frontend ki sahukiyat ke liye pipeline
+                        {
+                            $addFields: {
+                                owner: {
+                                    $first: "$owner"
+                                }
+                            }
+                        }
+                    ]
+
+                }
+            }
+        ]
+    )
+
+    return res.status(200).json(new ApiResponse(200, user[0].watchHistory, "Watch History fetched successfully !!"))
+})
+
+
+
+
+
+
+
 
 
 
@@ -458,5 +595,5 @@ const updateCoverImage = asyncHandler(async (req, res) => {
 export {
     registerUser, loginUser, logoutUser, refreshedAccessToken,
     changeCurrentPassword, getCurrentUser, updateAccountDetails,
-    updateUserAvatar, updateCoverImage
+    updateUserAvatar, updateCoverImage, getUserChannelProfile, getWatchHistory
 }
