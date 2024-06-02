@@ -518,7 +518,7 @@ const getUserChannelProfile = asyncHandler(async (req, res) => {
 
 })
 
-
+//get watchHostory
 const getWatchHistory = asyncHandler(async (req, res) => {
 
     //req.user._id se humko string milta hai jisko mongoose covert kar deta mongo db ki id me
@@ -593,7 +593,15 @@ const getWatchHistory = asyncHandler(async (req, res) => {
 
 
 export {
-    registerUser, loginUser, logoutUser, refreshedAccessToken,
-    changeCurrentPassword, getCurrentUser, updateAccountDetails,
-    updateUserAvatar, updateCoverImage, getUserChannelProfile, getWatchHistory
+    registerUser,
+    loginUser,
+    logoutUser,
+    refreshedAccessToken,
+    changeCurrentPassword,
+    getCurrentUser,
+    updateAccountDetails,
+    updateUserAvatar,
+    updateCoverImage,
+    getUserChannelProfile,
+    getWatchHistory
 }
